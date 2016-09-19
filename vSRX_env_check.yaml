@@ -1,0 +1,49 @@
+- name: Test vSRX env
+   hosts: all
+   tasks:   
+   - name: Dump hostvars
+     #     debug: msg="{{hostvars}}"
+     debug: msg="test msg"
+   - name: Check Memory Requirements
+     fail: msg="Insufficient free memory {{ansible_memfree_mb}}."
+     when: ansible_memfree_mb < 4000
+   - name: Check Processor requirements
+     fail: msg="Minimum 2 vCPU's required, avaialble {{ansible_processor_vcpus}}"
+     when: ansible_processor_vcpus < 2
+   - name: Check Disk Free space
+     fail: msg="Not enough disk space"
+     when: ( item.mount == '/' ) and ( item.size_available < 160000000 )
+     with_items: ansible_mounts
+   - name: Check CPU flags Debian
+     when: ansible_distribution == "Debian"
+     shell: /bin/grep vmx /proc/cpuinfo | wc -l
+     register: cpu_flags
+     ignore_errors: True
+     changed_when: "cpu_flags.rc == -1"
+   - name: Check CPU flags Linux
+     when: ansible_distribution == "CentOS"
+     shell: /bin/grep smx /proc/cpuinfo | wc -l
+     register: cpu_flags
+     ignore_errors: True
+     changed_when: "cpu_flags.rc == -1"
+   - name: Check Virtualization CPU flags
+     fail: msg="Virtualization CPU flags not enabled for host."
+     when: cpu_flags.stdout|int == 0
+   - name: install kvm related packages on RedHat based OS
+     when: ansible_os_family == 'RedHat'
+     yum: name={{ item }}
+     with_items:
+      - qemu-kvm
+      - bridge-utils
+      - qemu-img
+      - libvirt-python
+      - libvirt
+   - name: install kvm related packages on Debian based OS
+     when: ansible_os_family == 'Debian'
+     apt: pkg={{ item }}
+     with_items:
+      - qemu-kvm
+      - bridge-utils
+      - qemu-utils
+      - python-libvirt
+      - libvirt-bin
